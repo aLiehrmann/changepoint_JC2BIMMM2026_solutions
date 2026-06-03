@@ -1,5 +1,0 @@
-"0","FpopWrapper <- function(x, sdFUN=sd, alpha=2) {"
-"0","  est_sd <- sd(x)"
-"0","  n      <- length(x)"
-"0","  Fpop(x, lambda=alpha*est_sd^2*log(n)) # Yao 1988 penalty"
-"0","}"

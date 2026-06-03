@@ -1,1 +1,0 @@
-"0","est_sd <- sd(diff(x)) / sqrt(2)   # difference-based (robust to changepoints)"
