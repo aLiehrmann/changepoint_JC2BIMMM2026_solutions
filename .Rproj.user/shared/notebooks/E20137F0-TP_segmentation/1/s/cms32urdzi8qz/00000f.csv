@@ -1,0 +1,13 @@
+"0","lfc_list <- lapply(cov_list, function(cov_mat) {"
+"0","  wt_cols  <- grep(""^wt"",  colnames(cov_mat), value = TRUE)"
+"0","  mut_cols <- grep(""^mut"", colnames(cov_mat), value = TRUE)"
+"0","  rowMeans(log2(cov_mat[, mut_cols] + pseudo)) -"
+"0","  rowMeans(log2(cov_mat[, wt_cols]  + pseudo))"
+"0","})"
+"0","names(lfc_list) <- names(cov_list)"
+"0",""
+"0","str(lfc_list)"
+"1","List of 2
+ $ forward: num [1:154478] 0 0 0 0 0 0 0 0 0 0 ...
+ $ reverse: num [1:154478] 2.238 3.654 2.076 -0.193 1.85 ...
+"

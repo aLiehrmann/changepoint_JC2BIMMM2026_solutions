@@ -1,0 +1,49 @@
+body { counter-reset: question-counter exercise-counter note-counter; }
+
+/* Questions — blue, auto-numbered */
+div.question {
+  color: #1565C0;
+  border-left: 4px solid #1565C0;
+  background-color: #EEF2FF;
+  padding: 0.4em 1em;
+  margin: 1em 0;
+  counter-increment: question-counter;
+}
+div.question::before {
+  content: "Question " counter(question-counter) ".";
+  font-weight: bold;
+  display: block;
+  margin-bottom: 0.3em;
+}
+
+/* Exercises — green, auto-numbered */
+div.exercise {
+  color: #1B5E20;
+  border-left: 4px solid #2E7D32;
+  background-color: #F1F8E9;
+  padding: 0.4em 1em;
+  margin: 1em 0;
+  counter-increment: exercise-counter;
+}
+div.exercise::before {
+  content: "Exercise " counter(exercise-counter) ".";
+  font-weight: bold;
+  display: block;
+  margin-bottom: 0.3em;
+}
+
+/* Notes — yellow, auto-numbered */
+div.note {
+  color: #4E3400;
+  border-left: 4px solid #F9A825;
+  background-color: #FFFDE7;
+  padding: 0.4em 1em;
+  margin: 1em 0;
+  counter-increment: note-counter;
+}
+div.note::before {
+  content: "Note " counter(note-counter) ".";
+  font-weight: bold;
+  display: block;
+  margin-bottom: 0.3em;
+}

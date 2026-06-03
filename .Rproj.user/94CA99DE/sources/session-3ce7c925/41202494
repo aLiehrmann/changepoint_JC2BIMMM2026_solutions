@@ -1,0 +1,26 @@
+{
+    "id": "41202494",
+    "path": "~/Documents/enseignements/changepoint_JC2BIMMM/TP_V3/R/utils.R",
+    "project_path": "R/utils.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1779137622963.0,
+    "source_on_save": false,
+    "relative_order": 4,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "29,41",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1779187041,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1779187041,
+    "read_only": false,
+    "read_only_alternatives": []
+}

@@ -1,0 +1,2 @@
+"0","seg_list <- lapply(lfc_list, FpopWrapper, alpha=3)"
+"0","names(seg_list) <- names(lfc_list)"

@@ -1,0 +1,3 @@
+"0","legend(""bottomright"","
+"0","       legend = paste0(""D(alpha=3) = "", D_alpha3),"
+"0","       col = ""black"", lty = 2, bty = ""n"")"

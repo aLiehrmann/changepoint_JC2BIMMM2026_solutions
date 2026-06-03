@@ -1,0 +1,7 @@
+sample	condition	replicate	forward	reverse
+wt_1	wt	1	coverages/dataset_3_wt_1_forward.bw	coverages/dataset_3_wt_1_reverse.bw
+wt_2	wt	2	coverages/dataset_3_wt_2_forward.bw	coverages/dataset_3_wt_2_reverse.bw
+wt_3	wt	3	coverages/dataset_3_wt_3_forward.bw	coverages/dataset_3_wt_3_reverse.bw
+mut_1	mut	1	coverages/dataset_3_mut_1_forward.bw	coverages/dataset_3_mut_1_reverse.bw
+mut_2	mut	2	coverages/dataset_3_mut_2_forward.bw	coverages/dataset_3_mut_2_reverse.bw
+mut_3	mut	3	coverages/dataset_3_mut_3_forward.bw	coverages/dataset_3_mut_3_reverse.bw

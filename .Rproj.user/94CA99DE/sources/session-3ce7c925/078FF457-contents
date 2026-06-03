@@ -1,0 +1,242 @@
+library(rtracklayer)
+library(GenomicRanges)
+options(warn = -1) #options(warn = 0)
+
+simulate_coverage <- function(genes, genome_size, read_length, n_reads, size, ext_size,
+                              gene_strand = "+", n_rep = 3) {
+  
+  chr <- as.character(seqnames(genes[1]))
+  
+  genes_ext <- genes
+  genes_ext[genes_ext$processed] <- genes_ext[genes_ext$processed] + ext_size
+  
+  genes_ext3p <- genes
+  genes_ext5p <- genes
+  if (gene_strand == "+") {
+    end(genes_ext3p)[genes_ext3p$processed]   <- end(genes_ext3p)[genes_ext3p$processed]   + ext_size
+    start(genes_ext5p)[genes_ext5p$processed] <- start(genes_ext5p)[genes_ext5p$processed] - ext_size
+  } else {
+    start(genes_ext3p)[genes_ext3p$processed] <- start(genes_ext3p)[genes_ext3p$processed] - ext_size
+    end(genes_ext5p)[genes_ext5p$processed]   <- end(genes_ext5p)[genes_ext5p$processed]   + ext_size
+  }
+  
+  possible_starts <- unlist(lapply(seq_along(genes_ext), function(i) {
+    start(genes_ext[i]):(end(genes_ext[i]) - read_length + 1)
+  }))
+  
+  read_starts <- sample(possible_starts, n_reads, replace = TRUE)
+  
+  reads_ext <- GRanges(
+    seqnames = chr,
+    ranges   = IRanges(start = read_starts, width = read_length),
+    strand   = gene_strand
+  )
+  
+  zero_outside <- function(cov, regions) {
+    ig     <- gaps(regions, end = setNames(genome_size, chr))
+    ig     <- ig[strand(ig) == gene_strand]
+    pos    <- unlist(Map(seq, start(ig), end(ig)))
+    cov[pos] <- 0
+    cov
+  }
+  
+  cov_E  <- coverage(reads_ext, width = genome_size)[[chr]]
+  cov_M  <- zero_outside(cov_E, genes)
+  cov_E5 <- zero_outside(cov_E, genes_ext3p)
+  cov_E3 <- zero_outside(cov_E, genes_ext5p)
+  
+  simNB <- function(mu) {
+    replicate(n_rep, rnbinom(n = length(mu), mu = mu, size = size))
+  }
+  
+  list(cov_M  = simNB(as.numeric(cov_M)),
+       cov_E  = simNB(as.numeric(cov_E)),
+       cov_E3 = simNB(as.numeric(cov_E3)),
+       cov_E5 = simNB(as.numeric(cov_E5)))
+}
+
+################################################################################
+# SIMULATION
+
+# create PT annotation file
+annot    <- import("annotations/Arabidopsis_thaliana_col0.gtf")
+pt_annot <- annot[seqnames(annot)=="Pt" & annot$type=="gene"]
+rtracklayer::export.gff3(pt_annot, "annotations/Pt_ath.gff")
+pt_annot <- import("annotations/Pt_ath.gff")
+
+# mark wellspread genes as processed
+pt_annot_ext <- pt_annot + 100
+pt_annot_red <- reduce(pt_annot_ext)
+pt_annot$processed <- FALSE
+idx <- countOverlaps(pt_annot, pt_annot_red[countOverlaps(pt_annot_red, pt_annot_ext) > 1]) != 1
+pt_annot$processed[idx] <- TRUE
+
+# simu test
+seed <- 20261
+set.seed(seed)
+
+read_length <- 50
+n_reads     <- 5000
+size        <- 2.5
+pseudo      <- 1
+ext_size    <- 100
+pt_size     <- 154478L
+
+genes       <- pt_annot[strand(pt_annot) == "+"]
+
+coverages <- simulate_coverage(
+  genes        = genes,
+  genome_size  = pt_size,
+  read_length  = read_length,
+  n_reads      = n_reads,
+  size         = size,
+  ext_size     = ext_size,
+  gene_strand  = "+"
+)
+
+coverage_df <- data.frame(
+  pos       = 1:pt_size,
+  cov_E     = rowMeans(log2(coverages$cov_E  + pseudo)),
+  cov_E5    = rowMeans(log2(coverages$cov_E5 + pseudo)),
+  cov_M     = rowMeans(log2(coverages$cov_M  + pseudo)),
+  log2FC    = rowMeans(log2((coverages$cov_E  + pseudo) / (coverages$cov_M + pseudo))),
+  log2FC_E3 = rowMeans(log2((coverages$cov_E3 + pseudo) / (coverages$cov_M + pseudo))),
+  log2FC_E5 = rowMeans(log2((coverages$cov_E5 + pseudo) / (coverages$cov_M + pseudo)))
+)
+
+library(fpopw)
+sigma  <- sd(coverage_df$log2FC)
+pen    <- 2 * sigma^2 * log(length(coverage_df$log2FC))
+cp     <- Fpop_w(coverage_df$log2FC, rep(1, length(coverage_df$log2FC)), pen)$t.est
+cp_pos <- coverage_df$pos[cp[-length(cp)]]
+
+pdf("results/simu.pdf", width = 10, height = 8)
+par(mfrow = c(3, 1))
+
+for (start_w in seq(1, pt_size, by = 1000)) {
+  end_w <- min(start_w + 999, pt_size)
+  df_w  <- coverage_df[coverage_df$pos >= start_w & coverage_df$pos <= end_w, ]
+  cp_w  <- cp_pos[cp_pos >= start_w & cp_pos <= end_w]
+
+  plot(df_w$pos, df_w$cov_E, type = "l", lwd = 2,
+       xlim = c(start_w, end_w),
+       xlab = "Position génomique", ylab = "log2-couverture",
+       main = sprintf("Couverture [%d-%d]", start_w, end_w))
+  lines(df_w$pos, df_w$cov_M, col = "red", lwd = 2)
+  abline(v = cp_w, col = "darkgreen", lty = 2)
+  legend("topright", legend = c("all reads", "exonic reads"),
+         col = c("black", "red"), lwd = 2, bty = "n")
+
+  ylim_fc <- range(c(df_w$log2FC, df_w$log2FC_E3, df_w$log2FC_E5), na.rm = TRUE)
+  plot(df_w$pos, df_w$log2FC, type = "l", lwd = 2, col = "black",
+       xlim = c(start_w, end_w), ylim = ylim_fc,
+       xlab = "Position génomique", ylab = "log2-FC",
+       main = "log2-FC")
+  lines(df_w$pos, df_w$log2FC_E3, col = "steelblue", lwd = 2)
+  lines(df_w$pos, df_w$log2FC_E5, col = "tomato",    lwd = 2)
+  abline(h = 0, lty = 2)
+  abline(v = cp_w, col = "darkgreen", lty = 2)
+  legend("topright", legend = c("E/M", "E3/M", "E5/M"),
+         col = c("black", "steelblue", "tomato"), lwd = 2, bty = "n")
+
+  genes_w <- genes[end(genes) >= start_w & start(genes) <= end_w]
+  plot(0, 0, type = "n", xlim = c(start_w, end_w), ylim = c(0, 2),
+       xlab = "Position génomique", ylab = "", yaxt = "n", main = "Gènes")
+  if (length(genes_w) > 0)
+    rect(start(genes_w), 0.6, end(genes_w), 1.4,
+         col = ifelse(genes_w$processed, "steelblue", "grey70"), border = NA)
+  abline(v = cp_w, col = "darkgreen", lty = 2)
+  legend("topright", legend = c("processed", "non-processed"),
+         fill = c("steelblue", "grey70"), border = NA, bty = "n")
+}
+dev.off()
+
+
+set.seed(seed)
+cov_minus <- simulate_coverage(
+  genes        = pt_annot[strand(pt_annot) == "-"],
+  genome_size  = pt_size,
+  read_length  = read_length,
+  n_reads      = n_reads,
+  size         = size,
+  ext_size     = ext_size,
+  gene_strand  = "-"
+)
+set.seed(seed)
+cov_plus <- simulate_coverage(
+  genes        = pt_annot[strand(pt_annot) == "+"],
+  genome_size  = pt_size,
+  read_length  = read_length,
+  n_reads      = n_reads,
+  size         = size,
+  ext_size     = ext_size,
+  gene_strand  = "+"
+)
+
+################################################################################
+# PREPARE DATASETS FOR TP
+
+# dataset_1: mut = cov_E  (reads extending both ends)
+# dataset_2: mut = cov_E3 (reads extending 3' end only)
+# dataset_3: mut = cov_E5 (reads extending 5' end only)
+
+dir.create("coverages", showWarnings = FALSE, recursive = TRUE)
+dir.create("metadata",  showWarnings = FALSE, recursive = TRUE)
+
+chr <- "Pt"
+
+export_bw <- function(cov_vec, chr, filepath) {
+  rl <- RleList(setNames(list(Rle(as.numeric(cov_vec))), chr))
+  export.bw(rl, filepath)
+}
+
+wt_plus  <- cov_plus$cov_M
+wt_minus <- cov_minus$cov_M
+
+mut_configs <- list(
+  list(plus = cov_plus$cov_E,  minus = cov_minus$cov_E),
+  list(plus = cov_plus$cov_E3, minus = cov_minus$cov_E3),
+  list(plus = cov_plus$cov_E5, minus = cov_minus$cov_E5)
+)
+
+for (i in seq_along(mut_configs)) {
+  mut_p <- mut_configs[[i]]$plus
+  mut_m <- mut_configs[[i]]$minus
+
+  samples    <- c(paste0("wt_",  1:3), paste0("mut_", 1:3))
+  conditions <- c(rep("wt", 3), rep("mut", 3))
+  replicates <- rep(1:3, 2)
+  fwd_paths  <- character(6)
+  rev_paths  <- character(6)
+
+  for (j in seq_along(samples)) {
+    cond <- conditions[j]
+    rep  <- replicates[j]
+    fwd_path <- sprintf("coverages/dataset_%d_%s_forward.bw", i, samples[j])
+    rev_path <- sprintf("coverages/dataset_%d_%s_reverse.bw", i, samples[j])
+
+    if (cond == "wt") {
+      export_bw(wt_plus[, rep],  chr, fwd_path)
+      export_bw(wt_minus[, rep], chr, rev_path)
+    } else {
+      export_bw(mut_p[, rep], chr, fwd_path)
+      export_bw(mut_m[, rep], chr, rev_path)
+    }
+
+    fwd_paths[j] <- fwd_path
+    rev_paths[j] <- rev_path
+  }
+
+  write.table(
+    data.frame(sample    = samples,
+               condition = conditions,
+               replicate = replicates,
+               forward   = fwd_paths,
+               reverse   = rev_paths,
+               stringsAsFactors = FALSE),
+    file      = sprintf("metadata/dataset_%d.tsv", i),
+    sep       = "\t",
+    quote     = FALSE,
+    row.names = FALSE
+  )
+}
